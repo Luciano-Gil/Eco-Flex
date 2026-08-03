@@ -1,0 +1,61 @@
+
+# ARCHIVO DE CONFIGURACIÓN DE DOCKER COMPOSE 
+# ==============================================================================
+# archivo que  orquesta el entorno de desarrollo local de la plataforma.
+# Levanta de forma aislada y coordinada dos servicios principales:
+#   1. db: base de datos PostgreSQL extendida con PostGIS para el manejo
+#      de datos geográficos y logísticos
+#   2. backend: aplicación en Node.js para exponer la API REST y gestionar la lógica de negocio
+# ==============================================================================
+
+services:
+  # servicio 1: base de datos (POSTGRESQL + POSTGIS)
+  db:
+    # Descarga e instala la imagen oficial que combina Postgres 15 y PostGIS 3.3 sobre Alpine Linux (liviana)
+    image: postgis/postgis:15-3.3-alpine
+
+    # Asigna un nombre fijo y fácil de identificar al contenedor 
+    container_name: ecoflex_postgres
+
+    # Configuración de credenciales e inicialización del motor de base de datos
+    environment:
+      - POSTGRES_USER=ecoflex_user          # Define el administrador de la base de datos 
+      - POSTGRES_PASSWORD=ecoflex_password  # Define la contraseña maestra de acceso
+      - POSTGRES_DB=ecoflex_db              # Define el nombre de la base de datos lógica inicial
+
+    # Mapeo de puertos para interactuar con el contenedor
+    ports:
+      - "5432:5432"  # Vincula el puerto [5432 de mi maquina] al puerto [5432 interno del contenedor]
+
+    # Persistencia de datos para evitar que la información se borre al apagar el contenedor
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Mapea el volumen nombrado al directorio de almacenamiento de Postgres
+
+  # ----------------------------------------------------------------------------
+  # servicio 2: backend (NODE.JS + EXPRESS + PRISMA)
+  
+  backend:
+    # En lugar de una imagen externa, Docker construirá una propia usando el Dockerfile local
+    build:
+      context: ./backend      # Ubicación de la carpeta del backend donde buscará el Dockerfile
+      dockerfile: Dockerfile  #  archivo que contiene las instrucciones de construcción
+
+    # Asigna un nombre fijo al contenedor del backend
+    container_name: ecoflex_backend
+
+    # Mapeo de puertos para consumir la API de Node.js
+    ports:
+      - "3000:3000"  # Vincula el puerto [3000 de mi máquina] al puerto [3000 de Node.js en el contenedor]
+
+    
+    volumes:
+      - ./backend:/usr/src/app         # Sincroniza los cambios hechos en el  código hacia el contenedor
+      - /usr/src/app/node_modules     # Evita que los node_modules de Windows pisen los node_modules del contenedor Linux, es decir , que no se sincronice la carpeta node_modules del host con la del contenedor 
+
+    # Control de orden de encendido de la infraestructura
+    depends_on:
+      - db  # Le ordena a Docker Compose no iniciar el backend hasta que el servicio 'db' esté corriendo
+
+# volumenes persistentes para la base de datos 
+volumes:
+  postgres_data: # Espacio reservado en disco administrado por Docker para los archivos de la BD
