@@ -49,8 +49,8 @@ services:
 
     
     volumes:
-      - ./backend:/usr/src/app         # Sincroniza los cambios hechos en el  código hacia el contenedor
-      - /usr/src/app/node_modules     # Evita que los node_modules de Windows pisen los node_modules del contenedor Linux, es decir , que no se sincronice la carpeta node_modules del host con la del contenedor 
+      - ./backend:/app         # Sincroniza los cambios hechos en el  código hacia el contenedor
+      - /app/node_modules     # Evita que los node_modules de Windows pisen los node_modules del contenedor Linux, es decir , que no se sincronice la carpeta node_modules del host con la del contenedor 
 
     # Control de orden de encendido de la infraestructura
     depends_on:
