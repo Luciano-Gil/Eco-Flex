@@ -19,10 +19,10 @@ services:
 
     # Configuración de credenciales e inicialización del motor de base de datos
     environment:
-      - POSTGRES_USER=ecoflex_user          # Define el administrador de la base de datos 
-      - POSTGRES_PASSWORD=ecoflex_password  # Define la contraseña maestra de acceso
-      - POSTGRES_DB=ecoflex_db              # Define el nombre de la base de datos lógica inicial
-
+      - POSTGRES_USER= ${POSTGRES_USER}          # Define el administrador de la base de datos 
+      - POSTGRES_PASSWORD= ${POSTGRES_PASSWORD}  # Define la contraseña maestra de acceso
+      - POSTGRES_DB=${POSTGRES_DB}         # Define el nombre de la base de datos lógica inicial
+   
     # Mapeo de puertos para interactuar con el contenedor
     ports:
       - "5432:5432"  # Vincula el puerto [5432 de mi maquina] al puerto [5432 interno del contenedor]
