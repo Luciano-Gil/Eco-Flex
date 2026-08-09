@@ -46,6 +46,8 @@ services:
     # Mapeo de puertos para consumir la API de Node.js
     ports:
       - "3000:3000"  # Vincula el puerto [3000 de mi máquina] al puerto [3000 de Node.js en el contenedor]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
 
     
     volumes:
