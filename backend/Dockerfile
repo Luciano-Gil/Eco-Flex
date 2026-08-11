@@ -12,6 +12,8 @@
 # Descarga la base oficial de Node.js en su versión ligera (Alpine Linux)
 FROM node:20-alpine
 
+# Instalar OpenSSL necesario para Prisma en Linux Alpine
+RUN apk add --no-cache openssl
 # Establece el directorio interno del contenedor donde se guardará y ejecutará el proyecto
 WORKDIR /app
 
