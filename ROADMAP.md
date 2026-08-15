@@ -26,6 +26,9 @@ Cada vez que iniciemos un nuevo chat para trabajar en un punto de este Roadmap, 
 - [ ] **1.4 Esquema Base de Prisma:** Modelar `Usuario`, `TransportistaDoc`, `Carga`, `RutaTransportista` y `Pago` en `schema.prisma`.
 - [ ] **1.5 Migración Inicial:** Ejecutar la migración en PostgreSQL + PostGIS vía Docker.
 - [ ] **1.6 Pipeline CI/CD:** Configurar `.github/workflows/ci.yml` para validaciones automáticas.
+- [ ] 1.6 Configuración del Entorno de Tests (tests/)Instalar y configurar el framework de pruebas (ej: Jest o Vitest + Supertest).
+    Crear el primer test de salud del servidor (GET /api/health).
+- [ ] 1.7 Pipeline CI/CD en GitHub Actions (.github/workflows/ci.yml):Configurar el robot para que ejecute automáticamente npm test en cada push o Pull Request.  -
 
 ### FASE 2: Módulo de Usuarios, Autenticación y Control Documental
 - [ ] **2.1 Hashing de Contraseñas:** Encriptación con `bcryptjs`.
