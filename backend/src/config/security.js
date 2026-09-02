@@ -1,41 +1,33 @@
 /**
- * ============================================================================
  * ARCHIVO DE CONFIGURACIÓN DE SEGURIDAD GLOBAL (security.js)
- * ============================================================================
+ *  librerías instaladas:
  * 
- * Explicación de las 3 librerías instaladas:
+ * HELMET: Oculta la firma del servidor (Express) en los encabezados HTTP para evitar que atacantes sepan qué tecnología usada
  * 
- * 1. HELMET: Oculta la firma del servidor (Express) en los encabezados HTTP
- *    para evitar que atacantes sepan qué tecnología usamos.
+ * CORS: Define qué páginas web (dominios) tienen permiso para llamar al backend y evita que sitios maliciosos usen sesiones de usuarios
  * 
- * 2. CORS: Define qué páginas web (dominios) tienen permiso para llamar
- *    a nuestro backend y evita que sitios maliciosos usen sesiones de usuarios.
- * 
- * 3. EXPRESS-RATE-LIMIT: Limita la cantidad de peticiones por IP en un tiempo
- *    determinado para proteger la memoria RAM contra ataques masivos (DDoS).
- * ============================================================================
+ * EXPRESS-RATE-LIMIT: Limita la cantidad de peticiones http por IP en un tiempo determinado para proteger la memoria RAM contra ataques masivos (DDoS)
  */
 
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 
-// Lista de direcciones web (dominios) permitidas para consultar la API
+// Lista de dominios permitidos para consultar la API
 const allowedOrigins = process.env.NODE_ENV === 'production'
   ? ['https://ecoflex.com'] // Dominio cuando la página esté subida a internet
-  : ['http://localhost:5173', 'http://localhost:3000']; // Direcciones de tu computadora local
+  : ['http://localhost:5173', 'http://localhost:3000']; // Direcciones de la compu local
 
 // Configuración de la librería CORS
 export const corsOptions = cors({
-  // La función origin se ejecuta automáticamente en cada petición entrante
+  // La función origin se ejecuta automáticamente en cada petición entrante, pasa de parametro el atributo origin de la cabecera HTTP y
+  //  un callback para indicar si se permite o no el acceso
   origin: (origin, callback) => {
-    // Si la petición NO tiene origen (ej: Thunder Client) O si la dirección está en allowedOrigins:
+    // Si la petición no tiene origen (ej: Thunder Client) o si la dirección está en allowedOrigins:
     if (!origin || allowedOrigins.includes(origin)) {
-      // Posición 1: null (sin errores) | Posición 2: true (acceso permitido)
-      callback(null, true);
+      callback(null, true);// null (sin errores) true (acceso permitido)
     } else {
-      // Si la dirección web no está permitida, se envía un objeto de Error y se bloquea
-      callback(new Error('Acceso no permitido por las políticas de CORS de EcoFlex'));
+      callback(new Error('Acceso no permitido por las políticas de CORS de EcoFlex'));// dirección web no permitida, se envía un objeto de Error y se bloquea
     }
   },
   
@@ -45,7 +37,9 @@ export const corsOptions = cors({
 });
 
 // Configuración de Helmet (aplica encabezados de seguridad por defecto)
-export const helmetMiddleware = helmet();
+export const helmetMiddleware = helmet(); // agrega encabezados HTTP de seguridad a las respuestas del servidor, ocultando información sensible y
+//  protegiendo contra ataques comunes como XSS, clickjacking y otros
+
 
 // Configuración del limitador de velocidad (Rate Limit)
 export const globalRateLimiter = rateLimit({
@@ -55,7 +49,8 @@ export const globalRateLimiter = rateLimit({
   // Límite máximo: 100 peticiones por cada IP dentro de esos 15 minutos
   max: 100, 
   
-  // Muestra información del límite en los encabezados de respuesta
+  // Muestra información del límite en los encabezados de respuesta, es decir que el servidor incluirá información sobre el límite de peticiones
+  //  en los encabezados de respuesta HTTP, lo que permite a los clientes conocer cuántas solicitudes les quedan antes de alcanzar el límite.
   standardHeaders: true, 
   
   // Desactiva encabezados viejos y obsoletos

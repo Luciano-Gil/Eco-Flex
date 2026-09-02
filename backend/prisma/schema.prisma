@@ -1,19 +1,165 @@
-// Configuración del generador de cliente Prisma
-generator client {
-  provider = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
-}
+// ===============================================================
+// configuracion de base de datots y generacion de cliente prisma
+// ===============================================================
 
-// Configuración de la conexión a la base de datos PostgreSQL
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL") // variable de entorno definida en .env, conectada a la base de datos PostgreSQL
 }
 
-// Modelo de prueba inicial para verificar la base de datos
-model Usuario {
-  id        Int      @id @default(autoincrement())
-  nombre    String
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"] // para compatibilidad con Vercely otros entornos de despliegue, para que funcione en cualquier sistema operativo y arquitectura
+}
+
+// ============================================================================
+// ENUMERACIONES (VALORES ESTÁNDAR DEL SISTEMA)
+// ============================================================================
+
+// Roles de acceso al sistema para autenticación y protección de rutas ( es decir que un usuario puede ser CLIENTE, CHOFER o ADMINISTRADOR)
+ 
+enum Role {
+  CLIENT    // Usuario 
+  DRIVER    // Chofer 
+  ADMIN     // Administrador 
+}
+
+// Modalidad de cobro del flete:
+ //PARCEL: Cobro por volumen (m3) para cargas parciales o pocos bultos
+ //REMOVAL: Cobro por distancia (km) para media mudanza o camión completo
+ 
+enum ServiceType {
+  PARCEL
+  REMOVAL
+}
+
+// Estados del ciclo de vida de la carga
+ 
+enum CargoStatus {
+  PENDING       // Publicado por el cliente, en espera de chofer
+  ACCEPTED      // Aceptado y asignado a un camión
+  IN_TRANSIT    // En viaje por la ruta
+  DELIVERED     // Entregado en destino
+  DISCREPANCY   // El chofer reportó diferencias entre lo declarado y lo real
+  CANCELLED     // Pedido cancelado
+}
+
+//Categorías estandarizadas de tamaño para cajas y muebles
+ //Utilizado por el inventario dinámico (procesado por Whisper/Gemini)
+ 
+enum ItemSize {
+  BOX_SMALL      // ~0.04 m3 (Libros, vajilla compacta, objetos densos)
+  BOX_MEDIUM     // ~0.12 m3 (Caja estándar de mudanza, ropa, adornos)
+  BOX_LARGE      // ~0.25 m3 (Acolchados, juguetes, cosas livianas pero voluminosas)
+  FURNITURE_M    // ~0.80 m3 (Mesa chica, sillas, electrodoméstico pequeño)
+  FURNITURE_L    // ~1.80 m3 (Heladera alta, sillón de 3 cuerpos, somier)
+}
+
+//Categorías estandarizadas de peso aproximado
+
+enum ItemWeight {
+  LIGHT          // Menos de 10 kg (se levanta con una mano sin esfuerzo)
+  MEDIUM         // 10 a 25 kg (lo levanta un adulto promedio)
+  HEAVY          // 25 a 50 kg (requiere dos personas para moverlo)
+  VERY_HEAVY     // Más de 50 kg (requiere carro de carga o herramientas)
+}
+
+// ============================================================================
+// ENTIDAD: USUARIOS (CLIENTES, CHOFERES Y ADMINISTRADORES)
+// ============================================================================
+
+model User {
+  id        String   @id @default(uuid())
   email     String   @unique
+  password  String
+  name      String
+  phone     String?
+  role      Role     @default(CLIENT)
+  
+  // Relación: Un usuario cliente puede solicitar múltiples cargas/fletes
+  cargos    Cargo[]  @relation("UserCargos")//usercargos es un alías para la relación entre usuario y cargos, asi prisma puede diferenciar entre las relaciones de usuario y cargos y evitar conflictos de nombres
+  
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+    @@map("users") // map lo q hace es crear en postgressql la tabla con minuscula y pluras( ya que es la convención de postgresql). con mayuscula es para esquema de prisma
+}
+
+// ============================================================================
+// ENTIDAD: CARGAS Y MUDANZAS 
+// ============================================================================
+
+model Cargo {
+  id             String       @id @default(uuid())
+  serviceType    ServiceType  @default(PARCEL) // tipo de servicio: PARCEL (por volumen) o REMOVAL (por distancia)
+  status         CargoStatus  @default(PENDING) // estado de la carga
+  
+  // Datos del recorrido 
+  originAddress  String
+  destAddress    String
+  distanceKm     Float?
+  
+  // Cálculos automáticos con margen de seguridad para el transportista
+  totalVolumeM3  Float?       // Volumen total estimado en metros cúbicos
+  totalWeightKg  Float?       // Peso total estimado en kilogramos
+  finalPrice     Float?       // Tarifa calculada según m3 o km
+  
+  // Transcripción de voz (Whisper) y notas de ítems difíciles de encasillar
+  voiceRawText   String?      // Texto crudo generado por la transcripción
+  extraNotes     String?      // Ej: "1 mesa plegable y 2 banquitos chicos"
+  
+  // Relación: Usuario cliente que solicitó la carga
+  userId         String
+  // clave foranea userId que hace referencia a la tabla users, y la relación se llama UserCargos establecida en el modelo user
+  // crea la fila userId y apunta al id del usuario en la tabla users
+  user           User         @relation("UserCargos", fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Relaciones hijas: Inventario de bultos y fotos de respaldo
+  items          CargoItem[]
+  images         CargoImage[]
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("cargos")
+}
+
+// ============================================================================
+// ENTIDAD: ÍTEMS DE LA CARGA (INVENTARIO DINÁMICO)
+// ============================================================================
+
+model CargoItem {
+  id          String      @id @default(uuid())
+  name        String      // Ej: "Cajas de ropa", "Lavarropas"
+  quantity    Int         @default(1)
+  size        ItemSize    @default(BOX_MEDIUM)
+  weight      ItemWeight  @default(LIGHT)
+  isConfirmed Boolean     @default(false) // Tilde de confirmación del cliente
+  
+  // Relación: Cada ítem pertenece a un pedido de carga puntual
+  cargoId     String
+  // relacion de clave foreanea creando la fila cargoId y apuntndo al id de la tabla cargos, y la relación se llama cargo establecida en el modelo cargo
+  cargo       Cargo       @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("cargo_items")
+}
+
+// ============================================================================
+// ENTIDAD: FOTOS DE RESPALDO (EVIDENCIA VISUAL OPCIONAL)
+// ============================================================================
+
+model CargoImage {
+  id        String   @id @default(uuid())
+  imageUrl  String   // URL de almacenamiento de la foto
+  
+  // Relación: La imagen pertenece a una carga puntual
+  cargoId   String
+  cargo     Cargo    @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@map("cargo_images")
 }

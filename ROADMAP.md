@@ -20,9 +20,9 @@ Cada vez que iniciemos un nuevo chat para trabajar en un punto de este Roadmap, 
 ## 🗺️ Estado del Proyecto (Checklist)
 
 ### FASE 1: Arquitectura Base, Seguridad Inicial e Integración Continua
-- [x ] **1.1 Cifrado y Secretos:** Configurar `.env` / `.env.example` para resguardar credenciales.
-- [ x] **1.2 Instancia Segura de Prisma:** Crear `lib/prisma.js` (Patrón Singleton para Connection Pool).
-- [ ] **1.3 Middlewares de Seguridad Global:** Implementar `helmet`, `cors`, `express-rate-limit` y parseo JSON seguro.
+- [ x ] **1.1 Cifrado y Secretos:** Configurar `.env` / `.env.example` para resguardar credenciales.
+- [ x ] **1.2 Instancia Segura de Prisma:** Crear `lib/prisma.js` (Patrón Singleton para Connection Pool).
+- [ x ] **1.3 Middlewares de Seguridad Global:** Implementar `helmet`, `cors`, `express-rate-limit` y parseo JSON seguro.
 - [ ] **1.4 Esquema Base de Prisma:** Modelar `Usuario`, `TransportistaDoc`, `Carga`, `RutaTransportista` y `Pago` en `schema.prisma`.
 - [ ] **1.5 Migración Inicial:** Ejecutar la migración en PostgreSQL + PostGIS vía Docker.
 - [ ] **1.6 Pipeline CI/CD:** Configurar `.github/workflows/ci.yml` para validaciones automáticas.
