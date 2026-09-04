@@ -20,7 +20,7 @@ services:
     #ojoo aca parche para que lea el archivo .env porq el docker compose no me toma las variables de entorno 
     restart: always
     env_file:
-      - .env
+      - ./backend/.env
 
     # Configuración de credenciales e inicialización del motor de base de datos
     environment:
