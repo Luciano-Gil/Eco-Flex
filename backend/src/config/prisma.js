@@ -1,4 +1,8 @@
-// importamos el cliente de Prisma para interactuar con la base de datos
+// lo que hace este  archivo es instaciar  prisma globalmante, para que no se creen multiples instancias de prisma en desarrollo,para que
+//  se pueda reutilizar la misma instancia de prisma en toda la aplicacion, y para que se pueda exportar la instancia de prisma para que pueda 
+// ser utilizada en otras partes de la aplicacion
+
+// importar el cliente de Prisma para interactuar con la base de datos
 import { PrismaClient } from '@prisma/client';
 
 
@@ -7,6 +11,7 @@ const globalForPrisma = global;
 
 // se reutiliza la instancia de PrismaClient si ya existe, de lo contrario se crea una nueva instancia 
 export const prisma = globalForPrisma.prisma || new PrismaClient({
+  // esto hace que en modo de desarrollo se muestren las consultas, errores y advertencias en la consola, mientras que en producción solo se muestren los errores
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
 });
 
