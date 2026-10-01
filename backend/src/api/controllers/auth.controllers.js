@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt'; // para el hashing de contraseñas
 import jwt from 'jsonwebtoken'; // para la generación y verificación de tokens JWT
-import { prisma } from '../config/prisma.js'; //  ruta a la instancia de Prisma
-import { jwtConfig } from '../config/jwt.config.js'; // importación de la configuración de JWT desde el archivo jwt.config.js
+import { prisma } from '../../config/prisma.js'; //  ruta a la instancia de Prisma
+import { jwtConfig } from '../../config/jwt.config.js'; // importación de la configuración de JWT desde el archivo jwt.config.js
 
 // 1. registrarse
 export const register = async (req, res) => {
@@ -39,7 +39,7 @@ export const register = async (req, res) => {
     const newUser = await prisma.user.create({
       data: {
         email,
-        passwordHash,
+        password: passwordHash,
         role,
         name: name || null,
         phone: phone || null
@@ -96,7 +96,7 @@ export const login = async (req, res) => {
     }
 
     // Comparar contraseña con Bcrypt
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Credenciales inválidas' });
     }

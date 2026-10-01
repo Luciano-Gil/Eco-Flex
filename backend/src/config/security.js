@@ -36,7 +36,8 @@ export const corsOptions = cors({
   credentials: true,
 });
 
-// Configuración de Helmet (aplica encabezados de seguridad por defecto)
+// Configuración de Helmet (aplica encabezados de seguridad por defecto como por ejemplo los que hacen el imframe sea cargado en u dominio propio y no en otro,
+//  evitando ataques de clickjacking)
 export const helmetMiddleware = helmet(); // agrega encabezados HTTP de seguridad a las respuestas del servidor, ocultando información sensible y
 //  protegiendo contra ataques comunes como XSS, clickjacking y otros
 
