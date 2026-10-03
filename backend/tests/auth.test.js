@@ -72,4 +72,11 @@ describe('Auth Endpoints (/api/auth)', () => {
 
     expect(res.status).toBe(401);
   });
+
+  // 5. Test de Logout
+  it('POST /api/auth/logout - Debería responder 200 confirmando el cierre de sesión', async () => {
+  const res = await request(app).post('/api/auth/logout');
+  expect(res.status).toBe(200);
+  expect(res.body.message).toBe('Sesión cerrada exitosamente');
+});
 });

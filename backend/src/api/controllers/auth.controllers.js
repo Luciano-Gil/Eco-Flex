@@ -151,4 +151,13 @@ export const profile = async (req, res) => {
     console.error('Error en profile:', error);
     return res.status(500).json({ message: 'Error interno del servidor' });
   }
+
+};
+
+// 4 LOGOUT
+
+export const logout = async (req, res) => {
+  return res.status(200).json({
+    message: 'Sesión cerrada exitosamente'
+  });
 };
