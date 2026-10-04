@@ -79,4 +79,87 @@ describe('Auth Endpoints (/api/auth)', () => {
   expect(res.status).toBe(200);
   expect(res.body.message).toBe('Sesión cerrada exitosamente');
 });
+// --- Tests de Control de Acceso por Roles  ---
+
+  it('GET /api/auth/driver-dashboard - Debería permitir acceso al DRIVER con 200', async () => {
+    // authToken ya corresponde al DRIVER  registrado al inicio
+    const res = await request(app)
+      .get('/api/auth/driver-dashboard')
+      .set('Authorization', `Bearer ${authToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Bienvenido al panel de Transportista');
+  });
+
+  it('GET /api/auth/driver-dashboard - Debería responder 403 si un CLIENT intenta entrar', async () => {
+    // Registro de  un CLIENT temporal
+    const clientRes = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: `cliente_${Date.now()}@ecoflex.com`,
+        password: 'PasswordSeguro123!',
+        role: 'CLIENT',
+        name: 'Cliente Test'
+      });
+
+    const clientToken = clientRes.body.token;
+
+    const res = await request(app)
+      .get('/api/auth/driver-dashboard')
+      .set('Authorization', `Bearer ${clientToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.message).toContain('Acceso denegado');
+  });
+
+  it('GET /api/auth/admin-dashboard - Debería permitir acceso al ADMIN con 200', async () => {
+    // Registro de  un ADMIN temporal
+    const adminRes = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: `admin_${Date.now()}@ecoflex.com`,
+        password: 'PasswordSeguro123!',
+        role: 'ADMIN',
+        name: 'Admin Test'
+      });
+
+    const adminToken = adminRes.body.token;
+
+    const res = await request(app)
+      .get('/api/auth/admin-dashboard')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Bienvenido al panel de Administrador');
+  });
+  // test de validacion de datos de registro:
+  it('POST /api/auth/register - Debería rechazar con 400 si la contraseña no cumple requisitos mínimos', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: `debil_${Date.now()}@ecoflex.com`,
+        password: 'corta',
+        name: 'Usuario Débil',
+        role: 'CLIENT',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe('Error de validación en los datos enviados');
+    expect(res.body.errors.length).toBeGreaterThan(0);
+  });
+
+  it('POST /api/auth/register - Debería rechazar con 400 si se envía un rol inexistente', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: `hacker_${Date.now()}@ecoflex.com`,
+        password: 'PasswordSeguro123!',
+        name: 'Hacker Rol',
+        role: 'SUPER_HACKER',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe('Error de validación en los datos enviados');
+  });
 });
+
