@@ -1,0 +1,131 @@
+# ==============================================================================
+# Pipeline de Integración y Entrega Continua (CI/CD) para EcoFlex Backend
+# 1. CI: Levanta PostgreSQL de prueba, migra el esquema y corre Jest.
+# 2. CD: Solo si los tests pasan y el push entra a 'main', compila la imagen
+#        Docker y la almacena versionada en GitHub Container Registry (GHCR).
+# ==============================================================================
+
+name: Backend CI/CD Pipeline
+
+# Disparadores: ante push o pull request dirigidos a la rama principal 'main'
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # ETAPA 1: CI (Integración Continua)
+  # Corre en todas las ramas y pull requests para validar que el código no falle.
+  # ----------------------------------------------------------------------------
+  test:
+    name: Run Automated Tests
+    runs-on: ubuntu-latest
+
+    # Directorio de trabajo predeterminado para no repetir 'cd backend'
+    defaults:
+      run:
+        working-directory: ./backend
+
+    # Servicios auxiliares: Contenedor PostgreSQL para base de datos de test
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: ecoflex_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      # Descarga el código fuente del repositorio en el runner de GitHub
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      # Instala Node.js v20 y cachea las dependencias de npm para acelerar el pipeline
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      # Instalación determinista basada estrictamente en package-lock.json
+      - name: Instalar dependencias
+        run: npm ci
+
+      # Genera los tipos de Prisma Client y aplica las migraciones en la BD de prueba
+      - name: Generar cliente de Prisma y correr migraciones
+        env:
+          DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/ecoflex_test_db?schema=public"
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+
+      # Ejecuta la suite de pruebas unitarias y de integración con Jest
+      - name: Ejecutar Suite de Tests (Jest)
+        env:
+          NODE_ENV: test
+          DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/ecoflex_test_db?schema=public"
+          JWT_SECRET: "ci_pipeline_jwt_test_secret_key"
+        run: npm test
+
+  # ----------------------------------------------------------------------------
+  # ETAPA 2: CD (Entrega Continua / Creación del artefacto Docker)
+  # Requiere que el job 'test' haya terminado con éxito.
+  # Condición: Solo se ejecuta si el evento es un push confirmado a 'main'.
+  # ----------------------------------------------------------------------------
+  build-and-push:
+    name: Build & Push Docker Image
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    # Permisos necesarios para escribir y almacenar paquetes en el registro de GitHub
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # Descarga el código actualizado de la rama main
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      # Autenticación automática contra el registro de contenedores de GitHub (GHCR)
+      - name: Iniciar sesión en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Configura etiquetas automáticas: 'latest' y el hash corto del commit (ej: sha-59e6946)
+      - name: Extraer metadatos y etiquetas para Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/backend
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      # Configura Buildx para optimización de capas en la compilación
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+    # Compila la imagen usando el Dockerfile de producción y la publica en GitHub Packages
+      - name: Construir y publicar imagen Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

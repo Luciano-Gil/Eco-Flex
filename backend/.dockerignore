@@ -1,0 +1,39 @@
+# ==============================================================================
+# Archivo .dockerignore para backend/
+# Lista de archivos y directorios que Docker NO debe copiar al armar la imagen.
+# Evita subir archivos pesados, secretos o específicos del entorno local.
+# ==============================================================================
+
+# Dependencias locales instaladas en la compu
+# No se deben copiar porque Docker ejecuta su propio 'npm ci' adentro del contenedor 
+# con la arquitectura y sistema operativo correspondiente (Linux Alpine).
+node_modules
+
+# Archivos de registro de errores generados automáticamente por npm en caso de fallos
+npm-debug.log
+
+# Archivo de variables de entorno principal (claves de base de datos, JWT secrets, etc.).
+# NUNCA se debe empaquetar dentro de la imagen por motivos críticos de seguridad
+.env
+
+# Comodín (*): ignora cualquier variante de archivo .env que pueda existir en el proyecto.
+# El asterisco hace que coincida con cualquier terminación:
+# Por ejemplo: .env.local, .env.development, .env.test, .env.production.
+# Evita que se filtre por error cualquier archivo secundario de secretos
+.env.*
+
+# Pruebas automatizadas (Jest, Supertest, mocks).
+# No son necesarias en el entorno de producción para que la API atienda peticiones;
+# dejarlas afuera reduce el peso final de la imagen.
+tests
+
+# Reportes de cobertura generados tras correr las pruebas
+coverage
+
+# Carpeta interna de control de versiones de Git.
+# No aporta nada al funcionamiento de Node.js y ahorra espacio y tiempo de compilación.
+.git
+
+# Configuraciones de workflows y acciones de GitHub.
+# Solo le interesan al repositorio remoto, no al contenedor en ejecución.
+.github

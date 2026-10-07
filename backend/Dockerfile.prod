@@ -1,0 +1,60 @@
+# ==============================================================================
+# Dockerfile.prod: Construcción de imagen optimizada para producción
+# Emplea Multi-Stage Build para separar la compilación del entorno final,
+# reduciendo el peso de la imagen y mejorando la seguridad.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# ETAPA 1: Construcción y dependencias (Builder)
+# ------------------------------------------------------------------------------
+FROM node:20-alpine AS builder
+
+# OpenSSL requerido por el motor de Prisma en distribuciones Alpine Linux
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+
+# Copia de manifiestos y esquemas necesarios antes de compilar
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Instala todas las dependencias (incluyendo devDependencies para compilar/generar)
+RUN npm ci
+
+# Genera el cliente de Prisma adaptado a Alpine Linux
+RUN npx prisma generate
+
+# Copia el código fuente completo del backend
+COPY . .
+
+# Elimina las dependencias de desarrollo (devDependencies) para aligerar node_modules
+RUN npm prune --production
+
+# ------------------------------------------------------------------------------
+# ETAPA 2: Entorno de ejecución en producción (Runner)
+# ------------------------------------------------------------------------------
+FROM node:20-alpine AS runner
+
+# OpenSSL en el runner final para que Prisma Client pueda conectarse a la BD
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+
+# Variables de entorno por defecto para producción
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Usuario estándar 'node' sin privilegios de administrador (root)
+USER node
+
+# Copia únicamente los archivos necesarios generados en la etapa previa
+COPY --chown=node:node --from=builder /app/package*.json ./
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node --from=builder /app/prisma ./prisma
+COPY --chown=node:node --from=builder /app/src ./src
+
+# Puerto de escucha del servicio
+EXPOSE 3000
+
+# En producción se ejecuta el comando de arranque estándar (sin nodemon)
+CMD ["npm", "start"]
