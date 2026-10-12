@@ -16,8 +16,7 @@ generator client {
 // ENUMERACIONES (VALORES ESTÁNDAR DEL SISTEMA)
 // ============================================================================
 
-// Roles de acceso al sistema para autenticación y protección de rutas ( es decir que un usuario puede ser CLIENTE, CHOFER o ADMINISTRADOR)
- 
+// Roles de acceso al sistema para autenticación y protección de rutas (es decir que un usuario puede ser CLIENTE, CHOFER o ADMINISTRADOR)
 enum Role {
   CLIENT    // Usuario 
   DRIVER    // Chofer 
@@ -25,16 +24,14 @@ enum Role {
 }
 
 // Modalidad de cobro del flete:
- //PARCEL: Cobro por volumen (m3) para cargas parciales o pocos bultos
- //REMOVAL: Cobro por distancia (km) para media mudanza o camión completo
- 
+// PARCEL: Cobro por volumen (m3) para cargas parciales o pocos bultos
+// REMOVAL: Cobro por distancia (km) para media mudanza o camión completo
 enum ServiceType {
   PARCEL
   REMOVAL
 }
 
 // Estados del ciclo de vida de la carga
- 
 enum CargoStatus {
   PENDING       // Publicado por el cliente, en espera de chofer
   ACCEPTED      // Aceptado y asignado a un camión
@@ -44,9 +41,8 @@ enum CargoStatus {
   CANCELLED     // Pedido cancelado
 }
 
-//Categorías estandarizadas de tamaño para cajas y muebles
- //Utilizado por el inventario dinámico (procesado por Whisper/Gemini)
- 
+// Categorías estandarizadas de tamaño para cajas y muebles
+// Utilizado por el inventario dinámico (procesado por Whisper/Gemini)
 enum ItemSize {
   BOX_SMALL      // ~0.04 m3 (Libros, vajilla compacta, objetos densos)
   BOX_MEDIUM     // ~0.12 m3 (Caja estándar de mudanza, ropa, adornos)
@@ -55,13 +51,27 @@ enum ItemSize {
   FURNITURE_L    // ~1.80 m3 (Heladera alta, sillón de 3 cuerpos, somier)
 }
 
-//Categorías estandarizadas de peso aproximado
-
+// Categorías estandarizadas de peso aproximado
 enum ItemWeight {
   LIGHT          // Menos de 10 kg (se levanta con una mano sin esfuerzo)
   MEDIUM         // 10 a 25 kg (lo levanta un adulto promedio)
   HEAVY          // 25 a 50 kg (requiere dos personas para moverlo)
   VERY_HEAVY     // Más de 50 kg (requiere carro de carga o herramientas)
+}
+
+// Estados de auditoría documental del transportista
+enum DocStatus {
+  PENDING        // Documentación enviada, pendiente de revisión del admin
+  APPROVED       // Aprobada: el chofer está habilitado para tomar viajes
+  REJECTED       // Rechazada con motivo especificado
+}
+
+// Estados de la transacción financiera en custodia (Escrow)
+enum PaymentStatus {
+  PENDING        // Esperando que el cliente abone en Mercado Pago
+  HELD_ESCROW    // Dinero cobrado y retenido por EcoFlex hasta entrega exitosa
+  RELEASED       // Fondos liberados y transferidos al chofer
+  REFUNDED       // Reembolsado al cliente ante cancelación
 }
 
 // ============================================================================
@@ -76,13 +86,22 @@ model User {
   phone     String?
   role      Role     @default(CLIENT)
   
-  // Relación: Un usuario cliente puede solicitar múltiples cargas/fletes
-  cargos    Cargo[]  @relation("UserCargos")//usercargos es un alías para la relación entre usuario y cargos, asi prisma puede diferenciar entre las relaciones de usuario y cargos y evitar conflictos de nombres
+  // Relación 1:N: Cargas creadas por este usuario como cliente
+  clientCargos Cargo[]       @relation("ClientCargos")
+
+  // Relación 1:N: Cargas asignadas a este usuario como chofer
+  driverCargos Cargo[]       @relation("DriverCargos")
+
+  // Relación 1:1: Legajo documental del chofer (solo si role == DRIVER)
+  driverDoc    DriverDoc?
+
+  // Relación 1:N: Rutas o trayectos declarados por el chofer
+  driverRoutes DriverRoute[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-    @@map("users") // map lo q hace es crear en postgressql la tabla con minuscula y pluras( ya que es la convención de postgresql). con mayuscula es para esquema de prisma
+  @@map("users")
 }
 
 // ============================================================================
@@ -91,8 +110,8 @@ model User {
 
 model Cargo {
   id             String       @id @default(uuid())
-  serviceType    ServiceType  @default(PARCEL) // tipo de servicio: PARCEL (por volumen) o REMOVAL (por distancia)
-  status         CargoStatus  @default(PENDING) // estado de la carga
+  serviceType    ServiceType  @default(PARCEL)
+  status         CargoStatus  @default(PENDING)
   
   // Datos del recorrido 
   originAddress  String
@@ -108,15 +127,18 @@ model Cargo {
   voiceRawText   String?      // Texto crudo generado por la transcripción
   extraNotes     String?      // Ej: "1 mesa plegable y 2 banquitos chicos"
   
-  // Relación: Usuario cliente que solicitó la carga
+  // Relación: Cliente que solicitó la carga (Obligatorio)
   userId         String
-  // clave foranea userId que hace referencia a la tabla users, y la relación se llama UserCargos establecida en el modelo user
-  // crea la fila userId y apunta al id del usuario en la tabla users
-  user           User         @relation("UserCargos", fields: [userId], references: [id], onDelete: Cascade)
+  user           User         @relation("ClientCargos", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Relación: Chofer asignado al flete (Opcional, null mientras esté PENDING)
+  driverId       String?
+  driver         User?        @relation("DriverCargos", fields: [driverId], references: [id], onDelete: SetNull)
   
-  // Relaciones hijas: Inventario de bultos y fotos de respaldo
+  // Relaciones hijas: Inventario de bultos, fotos y registro de pago
   items          CargoItem[]
   images         CargoImage[]
+  payment        Payment?
   
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -138,7 +160,6 @@ model CargoItem {
   
   // Relación: Cada ítem pertenece a un pedido de carga puntual
   cargoId     String
-  // relacion de clave foreanea creando la fila cargoId y apuntndo al id de la tabla cargos, y la relación se llama cargo establecida en el modelo cargo
   cargo       Cargo       @relation(fields: [cargoId], references: [id], onDelete: Cascade)
   
   createdAt   DateTime    @default(now())
@@ -162,4 +183,74 @@ model CargoImage {
   createdAt DateTime @default(now())
 
   @@map("cargo_images")
+}
+
+// ============================================================================
+// ENTIDAD: DOCUMENTACIÓN DEL TRANSPORTISTA (CONTROL DOCUMENTAL)
+// ============================================================================
+
+model DriverDoc {
+  id             String     @id @default(uuid())
+  cuit           String     @unique
+  licenseUrl     String     // URL del comprobante de licencia de conducir
+  vtvUrl         String     // URL del certificado VTV / RTO
+  insuranceUrl   String     // URL de la póliza de seguro del vehículo/carga
+  status         DocStatus  @default(PENDING)
+  rejectionNote  String?    // Motivo si el administrador rechaza la documentación
+
+  // Relación 1:1 con User (Chofer)
+  driverId       String     @unique
+  driver         User       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@map("driver_docs")
+}
+
+// ============================================================================
+// ENTIDAD: RUTAS DECLARADAS DEL TRANSPORTISTA (TRAYECTOS VACÍOS)
+// ============================================================================
+
+model DriverRoute {
+  id             String     @id @default(uuid())
+  originCity     String
+  destCity       String
+  departureDate  DateTime
+  availableM3    Float      // Capacidad volumétrica libre
+  availableKg    Float      // Capacidad de peso libre
+  isActive       Boolean    @default(true)
+
+  // Relación 1:N con User (Chofer)
+  driverId       String
+  driver         User       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@map("driver_routes")
+}
+
+// ============================================================================
+// ENTIDAD: REGISTRO FINANCIERO Y CUSTODIA (ESCROW)
+// ============================================================================
+
+model Payment {
+  id             String         @id @default(uuid())
+  amount         Float          // Monto total pagado por el cliente
+  platformFee    Float          // Comisión EcoFlex (10%)
+  insuranceFee   Float          @default(0) // Costo seguro opcional (1%)
+  driverAmount   Float          // Monto a liquidar al transportista
+  status         PaymentStatus  @default(PENDING)
+  mpPreferenceId String?        // ID de la preferencia en Mercado Pago
+  mpPaymentId    String?        // ID de pago devuelto por el Webhook de MP
+
+  // Relación 1:1 con Cargo
+  cargoId        String         @unique
+  cargo          Cargo          @relation(fields: [cargoId], references: [id], onDelete: Restrict)
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("payments")
 }
