@@ -1,14 +1,22 @@
-import bcrypt from 'bcrypt'; // para el hashing de contraseñas
-import jwt from 'jsonwebtoken'; // para la generación y verificación de tokens JWT
-import { prisma } from '../../config/prisma.js'; //  ruta a la instancia de Prisma
-import { jwtConfig } from '../../config/jwt.config.js'; // importación de la configuración de JWT desde el archivo jwt.config.js
+/**
+ * CONTROLADOR DE AUTENTICACIÓN (auth.controllers.js)
+ * Responsabilidad:
+ *  - Interceptar peticiones HTTP entrantes (req)
+ *  - Extraer parámetros de entrada (body, headers, context)
+ *  - Validar presencia básica de campos obligatorios 
+ *  - Delega trabajo pesado a servicios (auth.service.js)
+ *  - Mapea excepciones o respuestas a códigos de estado hhttp (200, 201, 400, 401, 500)
+ *  - Emite  respuesta serializada en formato Json (res)
+ */
 
-// 1. registrarse
+import * as authService from '../../services/auth.service.js';
+
+// Endpoint: POST /api/auth/register
+ //Registra un nuevo usuario 
 export const register = async (req, res) => {
   try {
+    // Extrae los parámetros del cuerpo de la petición
     const { email, password, role, name, phone } = req.body;
-    // se obtiene del cuerpo de la solicitud campos email, password, role, name y phone,
-    // necesarios para crear un nuevo usuario en la base de datos. Se espera que el cliente envíe estos datos en formato JSON al endpoint de registro
 
     if (!email || !password || !role) {
       return res.status(400).json({ 
@@ -16,68 +24,39 @@ export const register = async (req, res) => {
       });
     }
 
-    // Verifica  si el usuario ya existe
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
+    // Delega la lógica de creación y cifrado al servicio
+    const { user, token } = await authService.registerUser({
+      email,
+      password,
+      role,
+      name,
+      phone
     });
 
-    if (existingUser) {
-      return res.status(409).json({ 
-        message: 'El correo electrónico ya está registrado' 
-      });
-    }
-
-    // Hashear la contraseña con salt rounds, los rounds eran la 10 son las veces que se aplica el algoritmo de hashing para 
-    // aumentar la seguridad. A mayor número de rounds, más seguro pero más lento será el proceso de hashing
-    const saltRounds = 10;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
-    // las funciones await se utilizan para esperar a que las operaciones asincrónicas de hashing y búsqueda en la base de datos 
-    // se completen antes de continuar con el flujo del código.asegura q los datos estén listos antes de proceder a la siguiente operación, 
-    // evitando errores y garantizando la integridad de los datos
-
-    // Guardar en la base de datos
-    const newUser = await prisma.user.create({
-      data: {
-        email,
-        password: passwordHash,
-        role,
-        name: name || null,
-        phone: phone || null
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        name: true,
-        createdAt: true
-      }
-      //esta funcion usa await para esperar a que la operación de creación del usuario en la base de datos se complete antes de continuar y una 
-      // vez creado devuelve un objeto con los campos id, email, role, name y createdAt del nuevo usuario creado. y otro objeto ´select´ donde 
-      // se especifica qué campos del usuario recién creado se desean devolver en la respuesta, evitando exponer la contraseña
-    });
-
-    // Generar  token JWT de sesión inmediata
-    const token = jwt.sign( 
-      { userId: newUser.id, role: newUser.role },
-      jwtConfig.secret,
-      { expiresIn: jwtConfig.expiresIn }
-    );
-
+    // Respuesta exitosa con código 201 Created y token en payload
     return res.status(201).json({
       message: 'Usuario registrado exitosamente',
       token,
-      user: newUser
+      user
     });
   } catch (error) {
+    // Si el servicio arrojó un error con código HTTP específico (ej. 409 Conflict)
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+
+    // Manejo de fallas no controladas (errores de conexión a DB, caída de librerías)
     console.error('Error en register:', error);
     return res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
-// 2. LOGIN
+//Endpoint: POST /api/auth/login
+//  Autentica un usuario y genera su token Bearer
+
 export const login = async (req, res) => {
   try {
-    // obtengo del body de la solicitud los campos email y password
+    // Extrae  credenciales
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -86,75 +65,49 @@ export const login = async (req, res) => {
       });
     }
 
-    // Buscar el usuario
-    const user = await prisma.user.findUnique({
-      where: { email }
-    });
+    // Delega la verificación y firma de token al servicio
+    const { user, token } = await authService.loginUser({ email, password });
 
-    if (!user) {
-      return res.status(401).json({ message: 'Credenciales inválidas' });
-    }
-
-    // Comparar contraseña con Bcrypt
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Credenciales inválidas' });
-    }
-
-    // Generar token JWT
-    const token = jwt.sign(
-      { userId: user.id, role: user.role },
-      jwtConfig.secret,
-      { expiresIn: jwtConfig.expiresIn }
-    );
-
+    // Respuesta exitosa  y token de autorización
     return res.status(200).json({
       message: 'Inicio de sesión exitoso',
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        name: user.name
-      }
+      user
     });
   } catch (error) {
+    // Si las credenciales fallan, devuelve el 401 provisto por el servicio
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+
     console.error('Error en login:', error);
     return res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
-// 3. PERFIL DEL USUARIO AUTENTICADO
+// Endpoint: GET /api/auth/profile
+ //Devuelve la información del usuario actualmente autenticado
+ //Requiere que el middleware 'requireAuth' haya inyectado req.user previamente
 export const profile = async (req, res) => {
   try {
-    // req.user proviene del middleware que verifica el token, es decir que el middleware de autenticación JWT debe haber agregado la información del
-    //  usuario al objeto req antes de que esta función se ejecute.
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.userId },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        name: true,
-        phone: true,
-        createdAt: true
-      }
-    });
+    // Delega a servicio usando el ID de usuario proveniente del JWT decodificado
+    const user = await authService.getUserProfile(req.user.userId);
 
-    if (!user) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
+    // Retorno de la ficha del usuario en formato JSON
+    return res.status(200).json({ user });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ message: error.message });
     }
 
-    return res.status(200).json({ user }); // este user en corchetes referencia al objeto user q se encuentra en el archivo de la base de datos
-    //  y que se obtuvo con prisma.user.findUnique, no al req.user q viene del middleware
-  } catch (error) {
     console.error('Error en profile:', error);
     return res.status(500).json({ message: 'Error interno del servidor' });
   }
-
 };
 
-// 4 LOGOUT
+//Endpoint: POST /api/auth/logout
+//Cierre de sesión para clientes con token en cabecera Bearer. En arquitecturas stateless, el backend no mantiene estado de sesión, por lo que el logout es principalmente informativo. El cliente debe descartar el token en su frontend para "cerrar sesión".
+// En arquitecturas stateless sin cookies, el cliente descarta el token en su frontend.
 
 export const logout = async (req, res) => {
   return res.status(200).json({
