@@ -23,17 +23,17 @@ Cada vez que iniciemos un nuevo chat para trabajar en un punto de este Roadmap, 
 - [ x ] **1.1 Cifrado y Secretos:** Configurar `.env` / `.env.example` para resguardar credenciales.
 - [ x ] **1.2 Instancia Segura de Prisma:** Crear `lib/prisma.js` (Patrón Singleton para Connection Pool).
 - [ x ] **1.3 Middlewares de Seguridad Global:** Implementar `helmet`, `cors`, `express-rate-limit` y parseo JSON seguro.
-- [ ] **1.4 Esquema Base de Prisma:** Modelar `Usuario`, `TransportistaDoc`, `Carga`, `RutaTransportista` y `Pago` en `schema.prisma`.
-- [ ] **1.5 Migración Inicial:** Ejecutar la migración en PostgreSQL + PostGIS vía Docker.
-- [ ] **1.6 Pipeline CI/CD:** Configurar `.github/workflows/ci.yml` para validaciones automáticas.
-- [ ] 1.6 Configuración del Entorno de Tests (tests/)Instalar y configurar el framework de pruebas (ej: Jest o Vitest + Supertest).
+- [ x ] **1.4 Esquema Base de Prisma:** Modelar `Usuario`, `TransportistaDoc`, `Carga`, `RutaTransportista` y `Pago` en `schema.prisma`.
+- [ x ] **1.5 Migración Inicial:** Ejecutar la migración en PostgreSQL + PostGIS vía Docker.
+- [ x ] **1.6 Pipeline CI/CD:** Configurar `.github/workflows/ci.yml` para validaciones automáticas.
+- [ x ] 1.6 Configuración del Entorno de Tests (tests/)Instalar y configurar el framework de pruebas (ej: Jest o Vitest + Supertest).
     Crear el primer test de salud del servidor (GET /api/health).
-- [ ] 1.7 Pipeline CI/CD en GitHub Actions (.github/workflows/ci.yml):Configurar el robot para que ejecute automáticamente npm test en cada push o Pull Request.  -
+- [ x ] 1.7 Pipeline CI/CD en GitHub Actions (.github/workflows/ci.yml):Configurar el robot para que ejecute automáticamente npm test en cada push o Pull Request.  -
 
 ### FASE 2: Módulo de Usuarios, Autenticación y Control Documental
-- [ ] **2.1 Hashing de Contraseñas:** Encriptación con `bcryptjs`.
-- [ ] **2.2 Autenticación JWT:** Endpoints de Login y Registro (`/api/auth`).
-- [ ] **2.3 Middleware de Roles:** Guardián de seguridad para `CLIENTE`, `TRANSPORTISTA` y `ADMIN`.
+- [ x ] **2.1 Hashing de Contraseñas:** Encriptación con `bcryptjs`.
+- [ x ] **2.2 Autenticación JWT:** Endpoints de Login y Registro (`/api/auth`).
+- [ x ] **2.3 Middleware de Roles:** Guardián de seguridad para `CLIENTE`, `TRANSPORTISTA` y `ADMIN`.
 - [ ] **2.4 Subida Segura de Documentación:** Subida de Licencia, VTV/RTO y Póliza con validación de MIME type.
 - [ ] **2.5 Panel de Auditoría Admin:** Aprobar/Rechazar documentación de choferes.
 

@@ -1,13 +1,12 @@
-# ==============================================================================
-# Pipeline de Integración y Entrega Continua (CI/CD) para EcoFlex Backend
-# 1. CI: Levanta PostgreSQL de prueba, migra el esquema y corre Jest.
+# Pipeline de Integración y Entrega Continua
+# 1. CI: Levanta PostgreSQL de prueba, migra el esquema y corre Jest
 # 2. CD: Solo si los tests pasan y el push entra a 'main', compila la imagen
-#        Docker y la almacena versionada en GitHub Container Registry (GHCR).
+#        Docker y la almacena versionada en GitHub Container Registry (GHCR)
 # ==============================================================================
 
 name: Backend CI/CD Pipeline
 
-# Disparadores: ante push o pull request dirigidos a la rama principal 'main'
+# Disparadores: push o pull request dirigidos a la rama principal (main)
 on:
   push:
     branches: [ main ]
@@ -16,19 +15,20 @@ on:
 
 jobs:
   # ----------------------------------------------------------------------------
-  # ETAPA 1: CI (Integración Continua)
-  # Corre en todas las ramas y pull requests para validar que el código no falle.
+  # ETAPA 1: CI 
+  # Corre en todas las ramas y pull requests para validar que el código no falle
   # ----------------------------------------------------------------------------
   test:
+    # Nombre del job y sistema operativo del runner
     name: Run Automated Tests
     runs-on: ubuntu-latest
 
-    # Directorio de trabajo predeterminado para no repetir 'cd backend'
+    # Directorio de trabajo predeterminado para no repetir 'cd backend', es decir, todas las acciones se ejecutan dentro de la carpeta backend
     defaults:
       run:
         working-directory: ./backend
 
-    # Servicios auxiliares: Contenedor PostgreSQL para base de datos de test
+    # Servicios auxiliares: se crea un contendeor postgre vacio para correr los tests de integración
     services:
       postgres:
         image: postgres:15-alpine
@@ -38,6 +38,11 @@ jobs:
           POSTGRES_DB: ecoflex_test_db
         ports:
           - 5432:5432
+        # en options se define el comando de salud para asegurarse de que PostgreSQL esté listo antes de ejecutar los tests:
+        # health-cmd: comando que verifica si PostgreSQL está listo para aceptar conexiones
+        # health-interval: intervalo entre cada verificación de salud
+        # health-timeout: tiempo máximo que se espera para que el comando de salud se complete
+        # health-retries: número de intentos antes de considerar que el servicio no está saludable 
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -57,7 +62,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
-      # Instalación determinista basada estrictamente en package-lock.json
+      # Instalación de dependencias del package-lock.json
       - name: Instalar dependencias
         run: npm ci
 
@@ -79,8 +84,7 @@ jobs:
 
   # ----------------------------------------------------------------------------
   # ETAPA 2: CD (Entrega Continua / Creación del artefacto Docker)
-  # Requiere que el job 'test' haya terminado con éxito.
-  # Condición: Solo se ejecuta si el evento es un push confirmado a 'main'.
+  # Requiere que el job 'test' haya terminado con éxito, y solo se ejecuta si el evento es un push confirmado a 'main'
   # ----------------------------------------------------------------------------
   build-and-push:
     name: Build & Push Docker Image
@@ -98,15 +102,17 @@ jobs:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
 
-      # Autenticación automática contra el registro de contenedores de GitHub (GHCR)
+      # Autenticación automática contra el registro de contenedores 
       - name: Iniciar sesión en GitHub Container Registry
         uses: docker/login-action@v3
         with:
+          # Configura el registro de contenedores  y usa el token de GitHub para autenticarse (token que fue generado automáticamente por GitHub Actions y
+          # tiene permisos limitados)
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Configura etiquetas automáticas: 'latest' y el hash corto del commit (ej: sha-59e6946)
+      # Configuracion de  etiquetas automáticas: 'latest' y el hash corto del commit (ej: sha-59e6946)
       - name: Extraer metadatos y etiquetas para Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -116,7 +122,8 @@ jobs:
             type=raw,value=latest
             type=sha,format=short
 
-      # Configura Buildx para optimización de capas en la compilación
+      # Configura Buildx para optimización de capas en la compilación, lo q hace es permitir la construcción de imágenes Docker más eficientes 
+      # y rápidas, especialmente útil para proyectos grandes o con múltiples dependencias
       - name: Configurar Docker Buildx
         uses: docker/setup-buildx-action@v3
 

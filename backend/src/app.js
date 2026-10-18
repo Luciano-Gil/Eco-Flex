@@ -3,6 +3,7 @@
 import express from 'express';
 import { helmetMiddleware, corsOptions, globalRateLimiter } from './config/security.js'; // se importan los middlewares de seguridad desde el archivo de configuración
 import authRoutes from './api/routes/auth.routes.js';// se importan las rutas de autenticación desde el archivo auth.routes.js
+import driverRoutes from './api/routes/driver.routes.js'; // se importan las rutas de chofer desde el archivo driver.routes.js
 
 // se inicializa la instancia principal de Express
 const app = express();
@@ -24,5 +25,7 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'API de EcoFlex funcionando correctamente' });
 });
 
+// Choferes / Transportistas:
+app.use('/api/drivers', driverRoutes);
 // exportacion por defecto de la app para ser usada o encendida desde el archivo principal del servidor (server.js)
 export default app;
